@@ -77,8 +77,7 @@ async function main() {
   if (process.env.BOT_TOKEN === undefined) return;
   const bot = new Telegraf(process.env.BOT_TOKEN)
   const accounts = JSON.parse(await fs.readFile('db/accounts.json', 'utf-8'));
-
-  bot.on(message('text'), (ctx) => ctx.reply('Hello!'));
+  
   bot.launch();
   // Enable graceful stop
   process.once('SIGINT', () => bot.stop('SIGINT'));

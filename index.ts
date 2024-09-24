@@ -9,16 +9,12 @@ dotenv.config()
 
 export type Coin = {
   coinType: string;
-  name: string;
-  symbol: string;
+  coinName: string;
+  coinSymbol: string;
+  balance: number;
+  balanceUsd: number;
   decimals: number;
-  balance: string;
-  verified: boolean;
-  logo: string;
-  usdValue: string;
-  object: number;
-  price: string;
-  priceChange: string;
+  coinPrice: number;
 }
 
 export type Change = {
@@ -27,47 +23,53 @@ export type Change = {
   symbol: string;
   balanceBefore: string;
   balanceAfter: string;
+  diff: string;
 }
 
 export async function retrieveAccountCoins(account: string): Promise<Coin[]> {
-  const url = 'https://api.blockvision.org/v2/sui/account/coins';
+  const url = `https://api.blockberry.one/sui/v1/accounts/${account}/balance`;
   const res = await axios.get(url, {
     headers: {
-      'x-api-key': '2mVK2Fg56MdV77RwDoXpxNBx8T7',
+      'x-api-key': 'V5Wvhsgz0OsuRVYLDWwdTWWw2Rcacw',
       'Accept': 'application/json'
     },
     params: {
       account: account
     }
   });
-  // ensure the response is an array
-  return res.data.result.coins;
+  return res.data;
 }
 
 const chatId = '-1002428381219';
 
 async function getBalanceChange(name: string, coins: Coin[]) {
-  if (!existsSync('db/balances-' + name + '.json')) {
-    await fs.writeFile('db/balances-' + name + '.json', JSON.stringify(coins));
+  const filePath = `db/balances-${name}.json`;
+  if (!existsSync(filePath)) {
+    await fs.writeFile(filePath, JSON.stringify(coins));
   }
-  const balances = JSON.parse(await fs.readFile('db/balances-' + name + '.json', 'utf-8'));
+  const balances = JSON.parse(await fs.readFile(filePath, 'utf-8'));
   const changes: Change[] = [];
   for (const coin of coins) {
     if (!coin.coinType) continue;
     const balance = balances.find((b: Coin) => b.coinType === coin.coinType);
     if (balance !== undefined) {
-      if (balance.balance.toString() !== coin.balance) {
+      if (balance.balance.toString() !== coin.balance.toString()) {
+        console.log(`Balance changed for ${coin.coinType}`);
+        console.log(`Before: ${balance.balance}`);
+        console.log(`After: ${coin.balance}`);
+        console.log(`Diff: ${coin.balance - balance.balance}`);
         changes.push({
           coinType: coin.coinType,
-          name: coin.name,
-          symbol: coin.symbol,
-          balanceBefore: (BigInt(balance.balance) / BigInt(10 ** coin.decimals)).toString(),
-          balanceAfter: (BigInt(coin.balance) / BigInt(10 ** coin.decimals)).toString()
+          name: coin.coinName,
+          symbol: coin.coinSymbol,
+          balanceBefore: balance.balance.toString(),
+          balanceAfter: coin.balance.toString(),
+          diff: (balance.balance - coin.balance).toString()
         });
       }
     }
   }
-  await fs.writeFile('db/balances-' + name + '.json', JSON.stringify(coins));
+  await fs.writeFile(filePath, JSON.stringify(coins));
   return changes;
 }
 
@@ -83,13 +85,14 @@ async function main() {
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
   cron.schedule('* * * * *', async () => {
+    console.log(Date.now());
     for (const account of accounts) {
       const coins = await retrieveAccountCoins(account.address);
       const changes = await getBalanceChange(account.name, coins);
       if (changes.length === 0) continue;
       await bot.telegram.sendMessage(chatId, `Account ${account.name}`);
       for (const change of changes) {
-        await bot.telegram.sendMessage(chatId, `${change.coinType}\n ${change.name}\n ${change.symbol}\n ${change.balanceBefore} to ${change.balanceAfter}\n diff: ${BigInt(change.balanceAfter) - BigInt(change.balanceBefore)}`);
+        await bot.telegram.sendMessage(chatId, `${change.coinType}\n ${change.name}\n ${change.symbol}\n ${change.balanceBefore} to ${change.balanceAfter}\n diff: ${change.diff}`);
       }
     }
   });

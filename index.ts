@@ -85,8 +85,9 @@ async function main() {
   cron.schedule('* * * * *', async () => {
     for (const account of accounts) {
       const coins = await retrieveAccountCoins(account.address);
-      await bot.telegram.sendMessage(chatId, `Account ${account.name}`);
       const changes = await getBalanceChange(account.name, coins);
+      if (changes.length === 0) continue;
+      await bot.telegram.sendMessage(chatId, `Account ${account.name}`);
       for (const change of changes) {
         await bot.telegram.sendMessage(chatId, `${change.coinType}\n ${change.name}\n ${change.symbol}\n ${change.balanceBefore} to ${change.balanceAfter}\n diff: ${BigInt(change.balanceAfter) - BigInt(change.balanceBefore)}`);
       }

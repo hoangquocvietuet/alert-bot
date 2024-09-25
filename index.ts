@@ -7,6 +7,8 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
+
+
 export type Coin = {
   coinType: string;
   coinName: string;
@@ -54,17 +56,13 @@ async function getBalanceChange(name: string, coins: Coin[]) {
     const balance = balances.find((b: Coin) => b.coinType === coin.coinType);
     if (balance !== undefined) {
       if (balance.balance.toString() !== coin.balance.toString()) {
-        console.log(`Balance changed for ${coin.coinType}`);
-        console.log(`Before: ${balance.balance}`);
-        console.log(`After: ${coin.balance}`);
-        console.log(`Diff: ${coin.balance - balance.balance}`);
         changes.push({
           coinType: coin.coinType,
           name: coin.coinName,
           symbol: coin.coinSymbol,
           balanceBefore: balance.balance.toString(),
           balanceAfter: coin.balance.toString(),
-          diff: (balance.balance - coin.balance).toString()
+          diff: (coin.balance - balance.balance).toString()
         });
       }
     }
@@ -89,9 +87,18 @@ async function main() {
       const coins = await retrieveAccountCoins(account.address);
       const changes = await getBalanceChange(account.name, coins);
       if (changes.length === 0) continue;
+      console.log(`Account ${account.name} changes ${changes.length} coins`);
       await bot.telegram.sendMessage(chatId, `Account ${account.name}`);
       for (const change of changes) {
-        await bot.telegram.sendMessage(chatId, `${change.coinType}\n ${change.name}\n ${change.symbol}\n ${change.balanceBefore} to ${change.balanceAfter}\n diff: ${change.diff}`);
+        await bot.telegram.sendMessage(chatId, `
+          contract: ${change.coinType}
+          name: ${change.name} 
+          symbol: ${change.symbol}
+          balance before: ${change.balanceBefore}
+          balance after: ${change.balanceAfter}
+          diff: ${change.diff}
+          ${parseInt(change.diff) > 0 ? '🚀' : '🔻'}
+        `);
       }
     }
   });
